@@ -1,0 +1,79 @@
+step.cop<-function(x,y,H,alpha.in,alpha.out,my.range,k){
+	x=as.matrix(x)		
+        p=NCOL(x)
+        n=nrow(x)
+	if(k==1){
+	lambdar=0
+	aa=NULL
+        for(j in 1:p){
+                slice.1<-sapply(split(scale(x[,j]),as.factor(dr.slices(y,nslices=H)[[1]])),mean,simplify=TRUE)
+                aa[j]<-var(slice.1)
+            }
+	   lambdaf<-max(aa)
+         id<-which.max(aa)
+	   cop<-n*(lambdaf-lambdar)/(1-lambdaf)
+	   if(cop>=qchisq(alpha.in,1)){
+			my.current.sel=id
+		}else{
+			stop("There is no significant predictor!")
+	   	}
+		}else{
+			my.current.sel=1:k
+		}
+	    	my.step=1			
+		my.forward="conti"
+		chi.in=qchisq(alpha.in,k)
+		chi.out=qchisq(alpha.out,k)
+		while(my.forward=="conti"&my.step<=my.range){		
+        		set.all<-1:p
+        		set.redundant<-setdiff(set.all,my.current.sel)
+        		pp=length(set.redundant)        
+	  		if(length(my.current.sel)!=1){	   
+        			lambdar=dr(y~x[,my.current.sel],nslices=H)$evalues[1:k]
+	  			}else{
+				lambdar=lambdaf	
+				}
+	  		cop=lambdaf=NULL	  	
+        		for(j in 1:pp){
+                		ind1<-c(my.current.sel,set.redundant[j])
+                		xnew=x[,ind1]
+                		temp<-dr(y~xnew,nslices=H)
+		    		lambdaf<-temp$evalues[1:k]
+		   		 cop[j]<-sum(n*(lambdaf-lambdar)/(1-lambdaf)) 	     	
+        		}
+	  		cop.stata=max(cop[!is.na(cop)])	
+	  		sel<-which(cop==cop.stata)[1]	
+        		if(cop.stata>=chi.in){
+                		my.forward="conti"
+		    		my.current.sel<-c(my.current.sel,set.redundant[sel])
+				my.backward="conti"
+				while(my.backward=="conti"&length(my.current.sel)>2){
+					pp=length(my.current.sel)
+       				cop=NULL
+       				for(l in 1:pp){
+             				ind1<-my.current.sel[-l]
+               				xfull=x[,my.current.sel]
+					xreduce=x[,ind1]	
+               				temp1<-dr(y~scale(xfull),nslices=H)
+					temp2<-dr(y~scale(xreduce),nslices=H)
+            				cop[l]<-sum(n*(temp1$evalues[1:k]-temp2$evalues[1:k])/(1-temp1$evalues[1:k]))
+      	 					}
+					cop.statd=min(cop[!is.na(cop)])	
+	  				sel<-which(cop==cop.statd)[1]
+					if(cop.statd<=chi.out){
+                				my.backward="conti"
+		    				my.current.sel<-my.current.sel[-sel]
+						}else{
+						my.backward="stop"
+						}
+					}
+	       		}else{
+                			my.current.sel<-my.current.sel
+                			my.forward="stop"
+        			}
+			my.step=length(my.current.sel)
+		}	
+       	return(my.current.sel=my.current.sel)
+}
+
+
